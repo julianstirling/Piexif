@@ -226,7 +226,7 @@ class ExifTests(unittest.TestCase):
         im.save(o, format="jpeg", exif=exif_bytes)
         im.close()
         o.seek(0)
-        exif = load_exif_by_PIL(o)
+        load_exif_by_PIL(o)
 
     def test_dump_fail(self):
         with open(os.path.join("tests", "images", "large.jpg"), "rb") as f:
@@ -434,7 +434,7 @@ class ExifTests(unittest.TestCase):
     def test_roundtrip_files(self):
         files = glob.glob(os.path.join("tests", "images", "r_*.jpg"))
         for input_file in files:
-            logging.info(f"loading input file: %s", input_file)
+            logging.info("loading input file: %s", input_file)
             exif = piexif.load(input_file)
             exif_bytes = piexif.dump(exif)
             o = io.BytesIO()
@@ -562,7 +562,7 @@ class ExifTests(unittest.TestCase):
         exif_dict = {"0th": ZEROTH_IFD, "Exif": EXIF_IFD, "GPS": GPS_IFD}
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, INPUT_FILE1, "insert.jpg")
-        exif = load_exif_by_PIL("insert.jpg")
+        load_exif_by_PIL("insert.jpg")
 
         piexif.insert(exif_bytes, NOEXIF_FILE, "insert.jpg")
 
@@ -579,7 +579,7 @@ class ExifTests(unittest.TestCase):
         o = io.BytesIO()
         piexif.insert(exif_bytes, I1, o)
         self.assertEqual(o.getvalue()[0:2], b"\xff\xd8")
-        exif = load_exif_by_PIL(o)
+        load_exif_by_PIL(o)
 
     def test_insert_fail1(self):
         with open(INPUT_FILE1, "rb") as f:
@@ -613,7 +613,7 @@ class ExifTests(unittest.TestCase):
     # test utility methods----------------------------------------------
 
     def _compare_value(self, v1, v2):
-        if type(v1) != type(v2):
+        if type(v1) is not type(v2):
             if isinstance(v1, tuple):
                 self.assertEqual(pack_byte(*v1), v2)
             elif isinstance(v1, int):
@@ -623,12 +623,12 @@ class ExifTests(unittest.TestCase):
             elif isinstance(v1, bytes) and isinstance(v2, str):
                 try:
                     self.assertEqual(v1, v2.encode("latin1"))
-                except:
+                except Exception:
                     self.assertEqual(v1, v2)
             else:
                 try:
                     self.assertEqual(v1, v2.encode("latin1"))
-                except:
+                except Exception:
                     self.assertEqual(v1, v2)
         else:
             self.assertEqual(v1, v2)
@@ -651,7 +651,7 @@ class ExifTests(unittest.TestCase):
                         zeroth_ifd[key][:10],
                         pilDict[key][:10],
                     )
-                except:
+                except Exception:
                     logging.debug(
                         TAGS["0th"][key]["name"], zeroth_ifd[key], pilDict[key]
                     )
@@ -664,8 +664,10 @@ class ExifTests(unittest.TestCase):
                         exif_ifd[key][:10],
                         pilDict[key][:10],
                     )
-                except:
-                    logging.debug(TAGS["Exif"][key]["name"], exif_ifd[key], pilDict[key])
+                except Exception:
+                    logging.debug(
+                        TAGS["Exif"][key]["name"], exif_ifd[key], pilDict[key]
+                    )
         for key in sorted(gps_ifd):
             if key in gps:
                 self._compare_value(gps_ifd[key], gps[key])
@@ -673,7 +675,7 @@ class ExifTests(unittest.TestCase):
                     logging.debug(
                         TAGS["GPS"][key]["name"], gps_ifd[key][:10], gps[key][:10]
                     )
-                except:
+                except Exception:
                     logging.debug(TAGS["GPS"][key]["name"], gps_ifd[key], gps[key])
 
 
@@ -1036,7 +1038,7 @@ class WebpTests(unittest.TestCase):
         for filename in files:
             try:
                 Image.open(IMAGE_DIR + filename)
-            except:
+            except Exception:
                 print("Pillow can't read {}".format(filename))
                 continue
             piexif.insert(exif_bytes, IMAGE_DIR + filename, OUT_DIR + "ii_" + filename)

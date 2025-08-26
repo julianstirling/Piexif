@@ -40,7 +40,3 @@ dev = [
 requires = ["hatchling>=1.13"]
 build-backend = "hatchling.build"
 
-[tool.ruff]
-ignore = ["E722"]
-
-line-length = 88
