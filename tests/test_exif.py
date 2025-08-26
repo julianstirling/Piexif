@@ -9,6 +9,7 @@ import time
 import unittest
 
 from PIL import Image
+from PIL.TiffImagePlugin import IFDRational
 
 import piexif
 from piexif import (
@@ -52,12 +53,11 @@ class ExifTests(unittest.TestCase):
         }
         self.assertEqual(exif_dict, none_dict)
 
-    def test_load(self):
+    def test_load_only(self):
         files = glob.glob(os.path.join("tests", "images", "r_*.jpg"))
         for input_file in files:
             exif = piexif.load(input_file)
             e = load_exif_by_PIL(input_file)
-            print(input_file)
             self._compare_piexifDict_PILDict(exif, e)
 
     def test_load_m(self):
@@ -545,68 +545,60 @@ class ExifTests(unittest.TestCase):
 
     # test utility methods----------------------------------------------
 
-    def _compare_value(self, v1, v2):
+    def _compare_value(self, v1, v2, key, ifd):
+        fail_msg = f"Unequal for key {ifd}-'{hex(key)}': {v1}, {v2}"
         if type(v1) is not type(v2):
             if isinstance(v1, tuple):
-                self.assertEqual(pack_byte(*v1), v2)
+                if isinstance(v2, IFDRational):
+                    self.assertEqual(v1[0], v2.numerator, fail_msg)
+                    self.assertEqual(v1[1], v2.denominator, fail_msg)
+                else:
+                    self.assertEqual(pack_byte(*v1), v2, fail_msg)
             elif isinstance(v1, int):
-                self.assertEqual(struct.pack("B", v1), v2)
+                try:
+                    v1_conv = struct.pack("B", v1)
+                except Exception:
+                    raise ValueError(fail_msg)
+                self.assertEqual(v1_conv, v2, fail_msg)
             elif isinstance(v2, int):
-                self.assertEqual(struct.pack("B", v2), v1)
+                self.assertEqual(struct.pack("B", v2), v1, fail_msg)
             elif isinstance(v1, bytes) and isinstance(v2, str):
                 try:
-                    self.assertEqual(v1, v2.encode("latin1"))
+                    self.assertEqual(v1, v2.encode("latin1"), fail_msg)
                 except Exception:
-                    self.assertEqual(v1, v2)
+                    self.assertEqual(v1, v2, fail_msg)
             else:
                 try:
-                    self.assertEqual(v1, v2.encode("latin1"))
+                    self.assertEqual(v1, v2.encode("latin1"), fail_msg)
                 except Exception:
-                    self.assertEqual(v1, v2)
+                    self.assertEqual(v1, v2, fail_msg)
         else:
-            self.assertEqual(v1, v2)
+            if isinstance(v1, tuple):
+                self.assertEqual(len(v1), len(v2), fail_msg)
+                for n, (sub_v1, sub_v2) in enumerate(zip(v1, v2)):
+                    self._compare_value(sub_v1, sub_v2, key, ifd)
+            else:
+                self.assertEqual(v1, v2, fail_msg)
 
     def _compare_piexifDict_PILDict(self, piexifDict, pilDict):
         zeroth_ifd = piexifDict["0th"]
         exif_ifd = piexifDict["Exif"]
         gps_ifd = piexifDict["GPS"]
-        if 41728 in exif_ifd:
-            exif_ifd.pop(41728)  # value type is UNDEFINED but PIL returns int
-        if 34853 in pilDict:
-            gps = pilDict.pop(34853)
+        if 0xA300 in exif_ifd:
+            exif_ifd.pop(0xA300)  # value type is UNDEFINED but PIL returns int
 
         for key in sorted(zeroth_ifd):
             if key in pilDict:
-                self._compare_value(zeroth_ifd[key], pilDict[key])
-                try:
-                    logging.debug(
-                        TAGS["0th"][key]["name"],
-                        zeroth_ifd[key][:10],
-                        pilDict[key][:10],
-                    )
-                except Exception:
-                    logging.debug(
-                        TAGS["0th"][key]["name"], zeroth_ifd[key], pilDict[key]
-                    )
+                if key == 0x8825:
+                    continue
+                self._compare_value(zeroth_ifd[key], pilDict[key], key, "0th")
+
         for key in sorted(exif_ifd):
             if key in pilDict:
-                self._compare_value(exif_ifd[key], pilDict[key])
-                try:
-                    logging.debug(
-                        TAGS["Exif"][key]["name"],
-                        exif_ifd[key][:10],
-                        pilDict[key][:10],
-                    )
-                except Exception:
-                    logging.debug(
-                        TAGS["Exif"][key]["name"], exif_ifd[key], pilDict[key]
-                    )
-        for key in sorted(gps_ifd):
-            if key in gps:
-                self._compare_value(gps_ifd[key], gps[key])
-                try:
-                    logging.debug(
-                        TAGS["GPS"][key]["name"], gps_ifd[key][:10], gps[key][:10]
-                    )
-                except Exception:
-                    logging.debug(TAGS["GPS"][key]["name"], gps_ifd[key], gps[key])
+                self._compare_value(exif_ifd[key], pilDict[key], key, "Exif")
+
+        if 0x8825 in pilDict:
+            gps = pilDict.pop(0x8825)
+            for key in sorted(gps_ifd):
+                if key in gps:
+                    self._compare_value(gps_ifd[key], gps[key], key, "GPS")
