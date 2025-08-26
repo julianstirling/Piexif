@@ -33,7 +33,8 @@ python_requires = ">=3.7"
 dev = [
     "Pillow>=9.0.0",
     "ruff",
-    "codespell"
+    "codespell",
+    "coverage",
 ]
 
 [build-system]
